@@ -1,0 +1,3 @@
+﻿2017-01-24 18:33:10.271 -0700	START		Running EggDoc.script
+2017-01-24 19:05:42.751 -0700	EndTestCase		(Duration:"1952.479001", Errors:"1", Exceptions:"0", StartTime:"2017-01-24 18:33:10 -0700", Successes:"0", TestCase:"EggDoc.script", Warnings:"0")
+2017-01-24 19:05:42.752 -0700	ABORTED		Execution Time 0:32:32 EggDoc.script

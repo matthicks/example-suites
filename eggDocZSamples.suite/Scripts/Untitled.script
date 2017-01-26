@@ -1,0 +1,26 @@
+﻿(** Overall documentation for the script. **)
+
+(** Documentation for the initial handler. **)
+params a,b,c
+-- initial handler code is here
+
+(** Documentation for handler x. **)
+to handle x q,r,s
+	-- handler x code is here
+end x
+
+(** Documentation for handler y. **)
+to handle y t,u,v
+	-- handler y code is here
+end y
+
+(** Handler y extracts and returns the useful information from t using u and v as appropriate.
+@param t the source text from which to gather information
+@param u the user name
+@param v additional values -- this parameter is optional
+@returns a list of all extracted values, or empty on error
+@version 1.02
+ **)
+to handle y with t,u,v
+	-- handler y code is here
+end y

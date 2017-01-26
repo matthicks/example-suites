@@ -1,0 +1,4 @@
+﻿2017-01-24 19:18:08.278 -0700	START		Running EggDoc.script
+2017-01-24 19:18:16.423 -0700	set		INITIALSUITES = @"/Users/mhicks/Documents/eggDocZSamples.suite"	20	on_eggdoc	EggDoc.script
+2017-01-24 19:22:44.043 -0700	EndTestCase		(Duration:"275.764414", Errors:"1", Exceptions:"0", StartTime:"2017-01-24 19:18:08 -0700", Successes:"0", TestCase:"EggDoc.script", Warnings:"0")
+2017-01-24 19:22:44.044 -0700	ABORTED		Execution Time 0:04:35 EggDoc.script
