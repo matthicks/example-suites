@@ -1,0 +1,3 @@
+﻿BeginTestCase "james Test"
+runwithnewresults "james"
+EndTestCase "james Test"

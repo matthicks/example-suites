@@ -1,0 +1,6 @@
+﻿2015-09-02 09:48:50.050 -0600	START		Running master.script
+2015-09-02 09:48:50.050 -0600	BeginTestCase		james Test	1	on_master	master.script
+2015-09-02 09:48:50.050 -0600	runwithnewresults		james.script (P:/Documents/_EP Suites/D.suite/Results/james/20150902_094850.050/LogFile.txt)	2	on_master	master.script
+2015-09-02 09:48:51.051 -0600	EndTestCase		(Duration:"1.463", Errors:"0", Exceptions:"0", StartTime:"2015-09-02 09:48:50 -0600", Successes:"1", TestCase:"james Test", Warnings:"0")	3	on_master	master.script
+2015-09-02 09:48:52.052 -0600	EndTestCase		(Duration:"1.932", Errors:"0", Exceptions:"0", StartTime:"2015-09-02 09:48:50 -0600", Successes:"2", TestCase:"master.script", Warnings:"0")
+2015-09-02 09:48:53.053 -0600	SUCCESS		Execution Time 0:00:03 master.script
