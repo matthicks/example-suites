@@ -1,0 +1,392 @@
+﻿(** 
+This script generates documentation in HTML format for all of the scripts in a suite.  
+@author Doug Simons and various others
+@version 1.1
+@requires Eggplant 2.1 or later
+@modified May 1, 2006
+**)
+(** The main script. When called from the command line you should pass in the full path to a suite; otherwise the script will prompt the user for the suite.
+@param suitePath The path of a suite to process. If empty, the user will be prompted.
+ **)
+params suitePath
+
+set preferredBrowser to "Safari"
+
+if suitePath is empty then -- ask for the suite
+	put getSuitePath() into suitePath 
+	if suitePath is empty then exit handler
+end if 
+
+set the initialSuites to (suitePath)
+put items 1 to -2 delimited by "." of the last item delimited by "/" of suitePath into suiteName 
+
+(* Get the output file name *) 
+put getOutputFile(suiteName, "index") into outputFile 
+
+(* Go through file list to catalog them *) 
+put suitePath & "/Scripts/" into scriptsFolder 
+put the files of scriptsFolder into scriptFiles -- get list of fileDescription objects
+repeat with each item of scriptFiles by reference
+	if it does not end with ".script" then delete it -- remove non-script files from list
+end repeat
+
+(* Parse all of the scripts to gather documentation information *)
+set suiteInfo to parseScriptsForDocumentation(scriptFiles)
+
+(* Now generate the documentation files. *)
+createStyleSheetFor outputFile -- make sure a style sheet exists in that folder
+
+(* Creating output file as HTML *) 
+createHTMLPage outputFile, suiteInfo, suiteName 
+
+set headerTemplate to scriptHeaderTemplate()
+set bodyTemplate to scriptBodyTemplate()
+
+repeat with scriptName = each item of the keys of suiteInfo 
+	set scriptInfo to suiteInfo.(scriptName)
+	put getOutputFile(suiteName, scriptName) into scriptOutFile 
+	logFile merge(headerTemplate), scriptOutFile 
+	logFile merge(bodyTemplate), scriptOutFile 
+end repeat 
+
+(* Open main file with Browser *) 
+put resolvedFilePath(outputFile) into indexfile
+shell quote & indexfile & quote
+
+-----------------------------------(end of main script)-----------------------------------
+
+
+(** Prompts the user to select the suite to catalog.
+@returns the full path to the suite, or empty if no suite is selected
+ **) 
+function getSuitePath 
+	answer folder "Select Suite to Catalog" \ 
+	in folder (items 1 to -4 delimited by "/" of the long name of me) 
+			
+	(* Check for empty string in case of cancel *) 
+	if it is empty then return it 
+	
+	(* Check if valid eggplant suite has been chosen *) 
+	if it ends with "/" then delete the last character of it
+	if it ends with ".suite" then return it 
+	else return empty 
+end getSuitePath 
+
+(** Assemble the full path name of an HTML output file for a given suite. Any previous file at that location is deleted, and a new empty file is created in its place.
+@param suiteName the name of the suite 
+@param fileName the name of the script, or "index" for the suite index
+@returns the full path name of the HTML file
+ **)
+function getOutputFile suiteName, fileName
+	set tempStr to suiteName & "/" & fileName
+	replace every occurrence of " " with "_" in tempStr 
+	
+	put "~/Sites/ScriptCatalogs/" & tempStr & ".html" into outputFile 
+	create file outputFile -- replace any previous version
+	return outputFile 
+end getOutputFile 
+
+(** Parse each of the scripts in a list of fileDescriptions.
+This handler reads each script indicated by the list of fileDescriptions that was passed in, and locates each of the special documentation comments within that script. It calls the parseComment handler to extract the information from each comment. If the comment does not explicitly include a definition, it tries to extract the definition from the following line(s) of the script.
+@param scriptFiles should be a list of fileDescription objects
+@returns a property list containing all of the documentation information for the suite
+ **)
+to parseScriptsForDocumentation(scriptFiles)
+	set suiteInfo to (:)
+	repeat with each fileDescription in scriptFiles
+		set scriptText to the script of (filedescription as text)
+		set scriptName to fileDescription
+		delete the last item delimited by "." of scriptName
+		set scriptInfo to an empty list
+		
+		set commentStart to the offset of ("(" "*" "*") in scriptText
+		repeat while commentStart is not zero
+			set commentEnd to offset("**)", scriptText, commentStart)
+			put characters commentStart+3 to commentEnd-1 \
+			of scriptText into wholeComment
+					delete the first commentEnd+3 characters of scriptText
+			set handlerInfo to parseComment(wholeComment)
+			// look in script for definition if none supplied
+			if handlerInfo.definition is empty then
+				deleteEmptyLinesAtStart @scriptText
+				put the first word of scriptText into word1
+				if word1 is in ("to","on","function","params") then
+					set definition to the first line of scriptText
+					if word1 is "params" then
+						put "to handle " & scriptName \
+						into word 1 of definition
+							else -- check for params on next line
+						delete line 1 of scriptText
+						deleteEmptyLinesAtStart @scriptText
+						if word 1 of scriptText is "params" then
+							put " " & words 2 to last of line 1 of \
+							scriptText after definition
+								end if
+					end if
+					set handlerInfo.definition to definition
+				end if
+			else
+				combine handlerInfo.definition with return
+			end if
+			insert handlerInfo into scriptInfo
+			set commentStart to the offset of ("(*" "*") in scriptText
+		end repeat
+		set suiteInfo.(scriptName) to scriptInfo
+	end repeat
+	return suiteInfo
+end parseScriptsForDocumentation
+
+(** Deletes any empty lines at the start of some text passed in by reference.
+@param text The text from which empty lines will be deleted. Must be passed by reference.
+@returns empty -- pass the text by reference to receive anything useful from this!
+ **)
+to deleteEmptyLinesAtStart @text
+	repeat while word 1 of line 1 of text is empty
+		delete line 1 of text -- delete empty lines
+		if text is empty then exit repeat
+	end repeat
+end deleteEmptyLinesAtStart
+
+(** Parse a special EggDoc comment. All text prior to a line whose first word begins with "@" will be treated as the description attribute. A word beginning with "@" at the start of a line is used as a tag for all content up to the next tag. Tags may be repeated -- the value returned for each tag is a list of all of the values found for that tag.
+
+The tags @param and @params (or @return and @returns) are normalized as @params (or @returns). A tag of @endOfDoc may be used to tell the parser to ignore the remainder of that comment.
+
+@param wholeComment the full text of a special documentation comment to be parsed
+@return a property list containing all of the documentation attributes
+@endOfDoc -- nothing after this should be included in the documentation
+@param fiddleFaddle something silly and superfluous
+ **)
+to parseComment(wholeComment)
+	set tag to "description" -- first part of comment is the description
+	set currentText to empty
+	set info to (:)
+	put return & "@endOfDoc" after wholeComment -- set end marker
+	repeat with each line of wholeComment
+		if word 1 of it begins with "@" then
+			-- record current text and tag before getting next tag
+			replace every occurrence of return in currentText with "<br>"
+			insert currentText after property (tag) of info
+			-- get the next tag
+			set tag to chars 2 to last of word 1 of it
+			if tag ends with ":" then delete last char of tag
+			delete the first word of it -- remove the tag
+			if tag is "endOfDoc" then exit repeat -- done
+			if tag is in ("return", "param") then put "s" after tag
+			if tag is "params" or if tag is "property" then
+				put "<b>" before word 1 of it
+				put "</b> --" after word 1 of it
+			end if
+			set currentText to empty
+		end if
+		put (if currentText is empty then empty else return) & it after currentText
+	end repeat
+	combine info.description using (return & "<p>" & return)
+	return info
+end parseComment
+
+
+-----------------------------------(beginning of output handlers)-----------------------------------
+
+(** Create a style sheet file in the same folder as anOutputFile if it's not already there.
+@param anOutputFile full path to an output file -- style sheet will be created in the same folder
+ **)
+to createStyleSheetFor anOutputFile 
+	put {{ 
+	BODY    { 
+	background: peru; 
+	font: 11pt "Arial"; 
+	color: black; 
+	margin-left: 10%; 
+	margin-right: 15%; 
+	margin-top: 2%; 
+	} 
+	BODY.sp  { 
+	background: brown; 
+	font: 11pt "Comic Sans MS"; 
+	color: crimson; 
+	margin-left: 10%; 
+	margin-right: 15%; 
+	margin-top: 2%; 
+	font-weight: bold 
+	} 
+	TD       {font: 11pt "Arial"; color: black; text-align: left; font-weight: bold} 
+	TD.sp    {font: 11pt "Arial"; color: gray; text-align: justify} 
+	TH       {font: 14pt "Arial"; color: navy; font-weight: bold} 
+	H1       {font: 20pt "Arial"; color: maroon; font-weight: bold} 
+	H2       {font: 16pt "Arial"; color: gray; font-weight: bold} 
+	A        {font: 11pt "Arial"; color: navy; font-style: italic} 
+	A.sp     {font: 11pt "Arial"; color: white; font-style: italic; font-weight:bold} 
+	FONT.sp  {font: 10pt "Arial"; color: firebrick} 
+	P    {text-align: justify} 
+	P.pic    {text-align: center} 
+	P.indent {margin-left: 2em} 
+	P.outdent {margin-left: -2em} 
+	}}	into stylesheetContents 
+	
+	put anOutputFile into styleFile 
+	put "style.css" into the last item delimited by "/" of styleFile 
+	
+	if there is not a file styleFile then 
+		put stylesheetContents into file styleFile -- create the file 
+	end if 
+end to createStyleSheetFor 
+
+(** Generate the main HTML index page for the suite, listing all of the scripts.
+@params outputFile pathname of the output file where the generated HTML will go
+@param suiteInfo property list containing all of the documentation information
+@param suiteName the short name of the suite
+ **)
+on createHTMLPage
+	params outputFile, suiteInfo, suiteName 
+	(* Creating Header *) 
+	set headerTemplate to {{ 
+	<HTML> 
+	[[tab]]<HEAD> 
+	[[tab & tab]]<TITLE> 
+	[[tab & tab & tab & suiteName]] Script Catalog 
+	[[tab & tab]]</TITLE>
+	[[tab & tab]]<LINK REL=STYLESHEET HREF="style.css" TYPE="text/css"> 
+	[[tab]]</HEAD> 
+	}}	
+	logFile merge(headerTemplate), outputFile 
+	
+	(* Creating body *) 
+	set bodyTemplate to {{ 
+	[[tab]]<BODY> 
+	[[tab & tab]]<H1>Script Catalog for Suite - [[suiteName]]</H1> 
+	
+	[[if the number of items of keys of suiteInfo is greater than 0 then]] 
+	[[tab & tab]]<TABLE BGCOLOR=lightyellow BORDER="1" CELLSPACING="2" CELLPADDING="8"> 
+	[[tab & tab & tab]]<TR> 
+	[[tab & tab & tab]]<TH> Script Name </TH> 
+	[[tab & tab & tab]]<TH COLSPAN="10"> Description </TH> 
+	[[tab & tab & tab]]</TR> 
+	[[repeat with scriptName = each item of the keys of suiteInfo]] 
+	
+	[[tab & tab & tab]]<TR CELLPADDING="2"> 
+	[[tab & tab & tab]]<TD><a href="[[scriptName]].html">[[scriptName]]</a></TD> 
+	[[put getScriptDescription(suiteInfo,scriptname) into sDescription]] 
+	[[tab & tab & tab]]<TD CLASS="sp" COLSPAN="10">[[sDescription]]</TD> 
+	[[tab & tab & tab]]</TR> 
+	[[end repeat]] 
+	[[tab & tab]]</TABLE> 
+	[[else]] 
+	[[tab & tab]]<h2> No scripts available for cataloging</h2> 
+	[[end if]] 
+	[[tab]]</BODY> 
+	</HTML> 
+	}}	
+	logFile merge(bodyTemplate), outputFile 
+	
+end createHTMLPage 
+
+(** Get the header template for a script.
+@return the template (in HTML format) with fields for merging
+ **) 
+to handle scriptHeaderTemplate
+	return {{ 
+	<HTML> 
+	[[tab]]<HEAD> 
+	[[tab & tab]]<TITLE> 
+	[[tab & tab & tab & scriptName]] Script Details 
+	[[tab & tab]]</TITLE>
+	[[tab & tab]]<LINK REL=STYLESHEET HREF="style.css" TYPE="text/css"> 
+	[[tab]]</HEAD> 
+	}}	
+end scriptHeaderTemplate
+
+(** Get the template for the main body of a script documentation file.
+@returns the template (in HTML format) suitable for merging with script description information
+ **) 
+to handle scriptBodyTemplate
+	return {{ 
+	[[tab]]<BODY> 
+	[[tab & tab]]<H1>[[scriptName]] <font size=3> -- in suite <a href="index.html">[[suiteName]]</a></font></H1> 
+	[[set scriptDesc to getScriptDescription(suiteInfo,scriptName)]]
+	[[(if scriptDesc is not empty then scriptDesc else "(no description provided)")]]
+	<br>
+	[[set topInfo to getScriptTopLevelInfo(suiteInfo,scriptName)]]
+	[[delete topInfo.description]]
+	[[delete topInfo.definition]]
+	[[if the number of keys in topInfo is greater than zero then]]
+	<TABLE border=0>
+	[[repeat with each tagName in the keys of topInfo]]
+	[[tab & tab & tab]]<TR CELLPADDING="2"> 
+	[[tab & tab & tab]]<TD>&nbsp;</TD><TD valign="top"><i>[[tagName]]</i></TD>
+	[[put topInfo.(tagName) into tagDescription
+	combine tagDescription using "<br>"]]
+	[[tab & tab & tab]]<TD CLASS="sp" COLSPAN="9">[[tagDescription]]</TD> 
+	[[tab & tab & tab]]</TR> 
+	[[end repeat]]
+	</TABLE>
+	[[end if]]
+	<br>
+	
+	[[if the number of items in scriptInfo is (if scriptDesc is empty then 0 else 1) then]] 
+	<H3>There are no documented handlers in this script.</H3>
+	[[else]]
+	[[tab & tab]]<H3>Handlers in [[scriptName]] script:</H3>
+	[[tab & tab]]<TABLE BGCOLOR=lightyellow BORDER="0" CELLSPACING="2" CELLPADDING="8"> 
+	[[tab & tab & tab]]<TR CELLPADDING="0"> 
+	[[tab & tab & tab]]<TD COLSPAN="10" ><HR size = 1></TD>
+	[[tab & tab & tab]]</TR>
+	[[repeat with each item of scriptInfo]] 
+	[[if repeatIndex() is 1 and if it.definition is empty then next repeat]]
+	[[tab & tab & tab]]<TR CELLPADDING="2"> 
+	[[tab & tab & tab]]<TD COLSPAN="10" ><b>[[it.definition]]</b></TD>
+	[[tab & tab & tab]]</TR><TR> 
+	[[tab & tab & tab]]<TD>&nbsp;</TD><TD CLASS="sp" COLSPAN="10"> [[it.description]]</TD> 
+	[[tab & tab & tab]]</TR> 
+	[[repeat with each tagName in the keys of it]]
+	[[if tagName is in ("definition", "description") then next repeat]]
+	[[tab & tab & tab]]<TR CELLPADDING="2"> 
+	[[tab & tab & tab]]<TD>&nbsp;</TD><TD valign="top"><i>[[tagName]]</i></TD>
+	[[put it.(tagName) into tagDescription
+	combine tagDescription using "<br>"]]
+	[[tab & tab & tab]]<TD CLASS="sp" COLSPAN="9">[[tagDescription]]</TD> 
+	[[tab & tab & tab]]</TR> 
+	[[end repeat]]
+	[[tab & tab & tab]]<TR CELLPADDING="0"> 
+	[[tab & tab & tab]]<TD COLSPAN="10" ><HR size = 1></TD>
+	[[tab & tab & tab]]</TR>
+	[[end repeat]] 
+	[[tab & tab]]</TABLE> 
+	[[end if]]
+	[[tab]]</BODY> 
+	</HTML> 
+	}}	
+end scriptBodyTemplate 
+
+(** Write some text to the output file.
+@param strToLog the text to be written out
+@param outputFile the full path of the HTML output file to append the text to
+ **)
+on logFile strToLog, outputFile 
+	--put "+++++ Writing " & strToLog 
+	put strToLog & return after file outputFile 
+end logFile 
+
+(** 
+Extract the top-level description of a particular script from the suite documentation information.
+@param suiteInfo the property list containing the documentation info for a suite
+@param scriptName the name of the script for which to obtain a description
+@return the text describing the requested script, or empty if none is found
+**)
+to getScriptDescription suiteInfo, scriptName
+	if suiteInfo.(scriptName) is empty then return empty
+	set scriptInfo to item 1 of suiteInfo.(scriptName)
+	if scriptInfo.definition is not empty then return empty
+	return scriptInfo.description
+end getScriptDescription
+
+(** Extract the top-level documentation info for a particular script, from the suite documentation information.
+@param suiteInfo the property list containing the documentation info for a suite
+@param scriptName the name of the script for which to obtain a description
+@return a property list with documentation info for the requested script, or empty if none is found
+**)
+to getScriptTopLevelInfo suiteInfo, scriptName
+	if suiteInfo.(scriptName) is empty then return empty
+	set scriptInfo to item 1 of suiteInfo.(scriptName)
+	if scriptInfo.definition is not empty then return empty -- not top-level info
+	return scriptInfo
+end getScriptTopLevelInfo
