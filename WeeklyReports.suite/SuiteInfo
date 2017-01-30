@@ -1,0 +1,20 @@
+﻿{
+    EPVersionNumber = 1701112318;
+    PreRunScript = "setPrefs.script";
+    PreRunSelectionScript = "if formattedTime(\"%A\") is not Friday then\n\task \"What was the end date? (mm/dd/yyyy)\"\n\tput it into today\nend if\nif formattedTime(\"%A\") is not Friday then\n\task \"What was the end date? (mm/dd/yyyy)\"\n\tput it into today\nend if\n";
+    RunPreScript = NO;
+    Schedules =     (
+                {
+            ChangeCount = 0;
+            Name = "Schedule 1";
+            Schedule =             (
+            );
+        }
+    );
+    ScriptMetaData =     {
+    };
+    helpedSuitesInfo =     (
+    );
+    helperSuitesInfo =     (
+    );
+}

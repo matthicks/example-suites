@@ -1,0 +1,46 @@
+﻿if formattedTime("%A") is not Friday then
+	ask "What was the end date? (mm/dd/yyyy)"
+	put it into today
+end if
+
+put formattedTime("%m/%d/%Y %1I:%M %p")
+put "11/12/2016 8:23 AM"  into startTime
+put formattedTime("%A",startTime)
+if formattedTime("%A",startTime) is in ("Saturday","Sunday") then
+	repeat while formattedTime("%A",startTime) is not "Monday"
+		add 60 minutes to startTime
+	end repeat
+	put the minute of startTime into minutes
+	add (9 hours minus minutes) to startTime
+	if startTime is less than endTime then
+		put ("11/14/2016 10:29 AM"  minus startTime) divided by 60 seconds into openMinutes
+	else 
+		put 0 into openMinutes
+	end if
+	(*
+	put the long basic time of startTime
+	
+	put ("11/14/2016 10:29 AM"  minus startTime) divided by 60 seconds
+	if formattedTime("%A",startTime) is "Saturday" then add 2 days to startTime
+	put startTime
+	*)
+end if
+
+
+put ("7:30 PM" minus "11:00 AM") divided by 3600 seconds 
+
+11/14/2016 7:29 AM
+set the timeFormat to (:)
+put the timeFormat
+put "%m/%d/%Y %1I:%M %p" into customTime of the timeFormat
+put the timeformat
+put "11/14/2016 10:29 AM" as date
+put ("11/14/2016 10:29 AM"  minus "11/12/2016 8:23 AM") divided by 3600 seconds
+put ("2016-11-14T10:29 -0700"  minus "2016-11-12T08:23 PM -0700") divided by 3600 seconds
+
+repeat with each key of keys(the timeformat)
+	--	if (the timeformat).(key) contains "%1m/%1d/%Y" considering case then
+if (the timeformat).(key) contains "%p" then
+put key & colon && (the timeformat).(key)
+end if
+end repeat

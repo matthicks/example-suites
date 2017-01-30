@@ -1,0 +1,204 @@
+﻿Connect "Matthews-MacBook-Pro"
+
+if formattedTime("%A") is not Friday then
+	ask "What was the end date? (mm/dd/yyyy)"
+	put it into today
+end if
+
+if not imageFound("SalesForceIcon") then
+	TypeText F11
+	Click RemoteScreenSize()/2
+	TypeText CommandKey,ShiftKey,"A"
+	TypeText "firefox"
+	TypeText CommandKey,"o"
+	Click "Locationbar"
+	TypeText "http://www.salesforce.com"
+	TypeText Return
+	WaitFor 12.0, "ReloadIcon"
+	Click (Image:"LoginIcon", WaitFor:30)
+	If imageFound(image:"matthickstestplantcom", WaitFor: 8.0) then
+		click FoundImageLocation()
+	else
+		TypeText Return
+	End If
+else
+	click foundImageLocation()
+	TypeText CommandKey, UpArrow
+end if
+Click (Image:"Cases", WaitFor:31)
+Click (Image:"Go!", WaitFor:2.7)
+Put EveryImageLocation("PlusIcon") into caseList
+Put the number of items in caseList into CurrentOpen
+if not imageFound(0,"DateTimeOpened") then
+	Click "HorizontalScroll"	
+end if
+put (ImageRectangle("DateTimeOpened").topLeft.x - 10, (last item of caseList).y - 10) into UL
+put (imageLocation("TimeWith").x,(last item of caseList).y + 10) into LR
+put readText (UL,LR) into oldestOpenStart
+put oldestOpenStart
+put trunc((word -3 of oldestOpenStart as a date  minus word -6 of oldestOpenStart as a date) divided by 1 day) into oldestOpenAge
+If oldestOpenAge is more than 14 then
+	logError "At least one case open more than 2 weeks!"
+	CaptureScreen
+End If
+Click "Reports"
+Click (Image:"WeeklyCaseReport", WaitFor:27)
+setDateRange today
+Click (Image:"HideDetails", WaitFor:127)
+Wait 2
+TypeText CommandKey,DownArrow
+put readText("GrandTotals") into CasesNotClosed
+delete "(" from CasesNotClosed
+put word 3 of CasesNotClosed into CasesNotClosed
+TypeText CommandKey,UpArrow
+Click (Image:"Clear", WaitFor:240)
+Wait 2
+TypeText CommandKey,DownArrow
+put readText("GrandTotals") into totalCases
+delete "(" from totalCases
+put word 3 of totalCases into totalCases
+put totalCases - CasesNotClosed into adjustment
+TypeText CommandKey,UpArrow
+Click "Reports"
+Click "Throughput"
+setDateRange today
+Click (Image:"HideDetails", WaitFor:127)
+Wait 2
+TypeText CommandKey,DownArrow
+put readText("GrandTotals") into totalThroughput
+delete "(" from totalThroughput
+put (word 3 of totalThroughput) plus adjustment into totalThroughput
+TypeText CommandKey,UpArrow
+Click "Reports"
+Click (Image:"WeeklyCasesbyProduct", WaitFor:8)
+setDateRange today
+Click (Image:"HideDetails", WaitFor:127)
+repeat while not imageFound("avg")
+	TypeText DownArrow
+end repeat
+put ReadText("RunReport","avg") into totalsByProduct
+delete "(" from totalsByProduct
+TypeText CommandKey,UpArrow
+Click "ShowDetails"
+repeat while not imageFound("ProductFunctional")
+	TypeText downarrow
+end repeat
+repeat with EveryImageLocation(image:"CaseLink-000",searchRectangle:("RunReport","ProductFunctional"))
+	keydown CommandKey
+	Click it
+	keyup CommandKey
+end repeat
+
+Click "Reports"
+Click (Image:"Timesonly", WaitFor:3.5)
+setDateRange today
+Click "DateTimeOpened_1"
+typetext CommandKey, DownArrow
+keyDown ShiftKey
+Click "DataEnd"
+keyUp ShiftKey
+TypeText CommandKey,"c"
+put remoteClipboard() into timeData
+put timeData
+set the clockFormat to "24 hour"
+repeat with each line of timeData
+	put reformatDate(the first 3 words of it) into startTime
+	put reformatDate(words 4 to 6 of it) into endTime
+	if endTime is "-" then next repeat
+	put "RAW:" && (endTime minus startTime) divided by 60 seconds && "minutes open"
+	put the minute of endTime
+	if formattedTime("%A",startTime) is in ("Saturday","Sunday") then
+		put "incrementing startTime"
+		repeat while formattedTime("%A",startTime) is not "Monday"
+			add 60 minutes to startTime
+		end repeat
+		put the minute of startTime into minutes
+		// add (9 hours minus minutes) to startTime
+	end if
+	put (the long basic time of endTime) & " - " & the long basic time of startTime
+	if startTime is less than endTime then
+		if the day of endTime is equal to the day of startTime and the time of endTime is greater than "5:00  PM" as time
+			put "5:00 PM" into words 2 to 3 of endTime
+		end if
+		if the day of endTime is greater than the day of startTime then 
+			if the time of startTime is greater than "17:00" and the time of  endTime is greater than "02:00"
+				put "11:59 PM" into words 2 to 3 of startTime
+				subtract 2 hours from endTime
+			end if
+		end if
+	end if
+	
+	put (endTime minus startTime) divided by 60 seconds into openMinutes
+	if the day of endTime is greater than the day of startTime then 
+		if the time of startTime is less than "17:00" and the time of endTime is greater than "02:00" then
+			subtract 540 from openMinutes 
+		else if the time of startTime is more than "17:00" and the time of endTime is less than "02:00" then
+			put "All off the clock -- setting to 0"
+			put 0 into openMinutes
+			put ">>>>>>>>>>>>>>>>>>>"
+		end if
+	end if
+	if openMinutes is more than 240 then 
+		put "^^^^^^^^^^^^^^^^^^^^^^^^^^^^^"
+	end if
+	put "Open minutes:" && openMinutes
+	if openMinutes is more than 240 then add 1 to overSLA
+	if openMinutes is more than 270 then add 1 to moreThan30
+	insert openMinutes after responseTimes
+end repeat
+sort responseTimes
+log responseTimes
+put the middle item of responseTimes into medianResponse
+log "Median:" && the middle item of responseTimes
+log "Responses past SLA:" && overSLA
+log "Responses more than 30 minutes past SLA:" && moreThan30
+
+Log "Current open cases:" && CurrentOpen
+Log "Median response time:" && medianResponse
+Log "Oldest Open Age:" && oldestOpenAge
+Log "New Cases:" && totalCases
+Log "Throughtput:" && totalThroughput
+Log "By product:"
+repeat with each item delimited by return of totalsByProduct
+	if word 2 of it is empty or word -2 of it is not a number then next repeat
+	if word 2 of it is "-" then put "Unset" into word 2 of it
+	if word 3 of it is not a number then
+		log "      " & words 2 to 3 of it & colon && word -2 of it
+	else
+		log "      " & words 2 of it & colon && word -2 of it
+	end if
+end repeat
+
+to setDateRange today
+	set the remoteWorkInterval to .05
+	DoubleClick (Image:"From", WaitFor:10.2)
+	Click
+	set the remoteWorkInterval to .7
+	TypeText formattedTime("%1m/%1d/%Y",today - 6 days) 
+	TypeText return
+	CaptureScreen
+	Wait 1
+	set the remoteWorkInterval to .05
+	DoubleClick "To"
+	Click
+	set the remoteWorkInterval to .7
+	TypeText formattedTime("%1m/%1d/%Y",today) 
+	typeText return	
+	CaptureScreen increment:Yes
+	Wait 2
+end setDateRange
+
+
+function reformatDate dateString
+	if dateString starts with "-" then return "-"
+	put word 1 of dateString split by slash into dateBits
+	insert item 3 of dateBits before dateBits
+	delete item 4 of dateBits
+	
+	if word 3 of dateString is "PM" and word 1 delimited by colon of word 2 of dateString is not 12 then add 12  to word 1 delimited by colon of word 2 of dateString
+	
+	if word 1 delimited by colon of word 2 of dateString is less than 10 then put "0" before word 1 delimited by colon of word 2 of dateString
+	
+	put dateBits joined by "-" into tempDate
+	return (tempDate & "T" & words 2 of dateString && "-0700") 
+end reformatDate

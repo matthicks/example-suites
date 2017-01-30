@@ -1,0 +1,19 @@
+﻿{
+    CaptureDate = "2016-11-14 05:18:24 +0000";
+    CaptureHost = "Matthews-MacBook-Pro";
+    CaptureScreenSize =     (
+        1440,
+        900
+    );
+    HasAlpha = 1;
+    HotSpotX = 65;
+    HotSpotY = 6;
+    LastKnownLocationX = 0;
+    LastKnownLocationY = 0;
+    OriginalLocationX = 309;
+    OriginalLocationY = 433;
+    Precise = 0;
+    Pulsing = 0;
+    Scale = 1;
+    SearchAlgorithm = TextSmoothSquare;
+}
