@@ -1,0 +1,19 @@
+<html>
+<!-- 
+The Template uses SenseTalk's merge() function to replace any value inside 
+double square brackets with the result of executing that code in the script
+Please See The SenseTalk Reference manual for more documentation
+-->
+<head><title>[[suiteName]] Test Status Report</title></head><body><h1 align=center>Eggplant Test Results for Suite [[suiteName]]</h1>
+<h3 align=center>As of [[the date]]</h3>
+<UL>
+[[repeat with result = each item of results]]
+	[[convert result.LastRun to long date and long time]]
+	<LI>
+	Test Name: <b>[[result.ScriptName]]</b>
+	<br>
+	Status: <b><font color=[[(if result.Status is "Success" then "GREEN" else "RED")]]>[[result.Status]]</font></b>
+	<br>
+	Last Run: [[result.LastRun]]
+	</LI>[[end repeat]]</UL></body>
+</html>

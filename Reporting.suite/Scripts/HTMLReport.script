@@ -1,0 +1,158 @@
+{\rtf1\mac\ansicpg10000\cocoartf102
+{\fonttbl\f0\fnil\fcharset77 HelveticaNeue;\f1\fnil\fcharset77 HelveticaNeue-Bold;\f2\fnil\fcharset77 HelveticaNeue-Italic;
+}
+{\colortbl;\red255\green255\blue255;\red0\green110\blue5;\red0\green21\blue110;\red158\green0\blue11;
+\red0\green156\blue165;\red6\green102\blue165;\red158\green0\blue106;\red209\green121\blue0;\red72\green0\blue158;
+}
+\pard\tx560\tx1120\tx1680\tx2240\tx2800\tx3360\tx3920\tx4480\tx5040\tx5600\tx6160\tx6720\ql\qnatural
+
+\f0\fs28 \cf2 (*    \
+This script generates a report in HTML format containing status results for every script in a suite. \
+\
+The HTML is generated from a template file, using SenseTalk's merge() function to fill in the values. Two different templates are included with this suite, located in the Scripts folder. Edit them to suit your needs, using your favorite HTML editor. \
+*)\
+\cf0 \
+\cf2 (*Select which template to use: *)
+\fs24 \cf2 \
+\pard\tx560\tx1120\tx1680\tx2240\tx2800\tx3360\tx3920\tx4480\tx5040\tx5600\tx6160\tx6720\ql\qnatural
+
+\f1\b \cf3 put
+\f0\b0 \cf0  \cf4 "StatusReportTableTemplate.html"\cf0  
+\f1\b \cf3 into
+\f0\b0 \cf0  \cf5 templateName\cf0  \
+\cf2 --put "StatusReportListTemplate.html" into templateName -- alternate template using a list\cf0 \
+\
+
+\f1\b \cf3 put
+\f0\b0 \cf0  the long name of me 
+\f1\b \cf3 into
+\f0\b0 \cf0  \cf5 myPath\cf0  \cf2 -- get the full path name of this script\cf0 \
+
+\f1\b \cf3 put
+\f0\b0 \cf0  the folder of file \cf6 myPath\cf0  
+\f1\b \cf3 into
+\f0\b0 \cf0  \cf5 dir\cf0  \cf2 -- this script's directory\cf0 \
+
+\f1\b \cf3 put
+\f0\b0 \cf0  \cf6 dir\cf0  \cf7 &\cf0  \cf4 "/"\cf0  
+\f1\b \cf3 before
+\f0\b0 \cf0  \cf5 templateName\cf0 \
+
+\f1\b \cf3 put
+\f0\b0 \cf0  file \cf6 templateName\cf0  
+\f1\b \cf3 into
+\f0\b0 \cf0  \cf5 template\cf0  \cf2 -- read the HTML template\cf0 \
+\
+\cf2 (* \
+The first thing we want to do is ask the user to select the suite whose results will be reported.\
+We first determine the folder containing the suite 
+\f2\i \cf2 this
+\f0\i0 \cf2  script is in, and use that as the starting point for the open panel offered to the user.\
+*)\
+
+\f1\b \cf3 delete
+\f0\b0 \cf0  the last \cf8 3\cf0  items delimited by \cf4 "/"\cf0  of \cf6 myPath\cf0  \cf2 -- get the folder containing my suite\cf0 \
+\
+
+\f1\b \cf3 answer folder
+\f0\b0 \cf0  \cf4 "Select a Suite"\cf0  
+\f1\b \cf3 in folder
+\f0\b0 \cf0  \cf6 myPath\cf0  \cf2 -- let the user choose a suite\cf0 \
+
+\f1\b if
+\f0\b0  \cf6 it\cf0  \cf7 is\cf0  \cf4 empty\cf0  
+\f1\b then
+\f0\b0  
+\f1\b exit handler
+\f0\b0  \cf2 -- they didn't choose anything\cf0 \
+
+\f1\b \cf3 put
+\f0\b0 \cf0  \cf6 it\cf0  
+\f1\b \cf3 into
+\f0\b0 \cf0  \cf5 suite\cf0 \
+
+\f1\b \cf3 put
+\f0\b0 \cf0  the displayName of folder \cf6 suite\cf0  
+\f1\b \cf3 into
+\f0\b0 \cf0  \cf5 suiteName\cf0  \cf2 -- get user-friendly name\cf0 \
+\
+\cf2 (* Okay, we've got the suite. Now we want to get the results for that suite. *)\
+
+\f1\b \cf3 put
+\f0\b0 \cf0  \cf9 latestSuiteResults\cf0 (\cf6 suite\cf0 ) 
+\f1\b \cf3 into
+\f0\b0 \cf0  \cf5 testResults\cf0  \cf2 -- fetch the test results for every script in that suite\cf0 \
+
+\f1\b if
+\f0\b0  \cf6 testResults\cf0  \cf7 is\cf0  \cf4 empty\cf0  
+\f1\b then
+\f0\b0 \
+	
+\f1\b \cf3 answer
+\f0\b0 \cf0  \cf4 "There are no test results for suite "\cf0  \cf7 &\cf0  \cf6 suiteName\cf0  
+\f1\b \cf3 title
+\f0\b0 \cf0  \cf4 "No Results"\cf0 \
+	
+\f1\b exit handler
+\f0\b0 \
+
+\f1\b end if
+\f0\b0 \
+\
+\cf2 (* Now that we have the results let's put them in a property list *)\
+
+\f1\b \cf0 repeat
+\f0\b0  
+\f1\b with
+\f0\b0  
+\f1\b each
+\f0\b0  line of \cf6 testResults\cf0  \cf2 -- split the results into a list of property lists as expected by the template\cf0 \
+	
+\f1\b \cf3 insert
+\f0\b0 \cf0  \cf9 splitItems\cf0 (\cf6 it\cf0 , (\cf4 "ScriptName"\cf0 ,\cf4 "Status"\cf0 ,\cf4 "TotalCount"\cf0 ,\cf4 "FailureCount"\cf0 , \\\
+			\cf4 "FirstRun"\cf0 , \cf4 "LastRun"\cf0 , \cf4 "AverageTime"\cf0 ) ) 
+\f1\b \cf3 after
+\f0\b0 \cf0  \cf5 results\cf0 \
+
+\f1\b end repeat
+\f0\b0 \
+\
+\cf2 (* Setup Results Location *)\
+
+\f1\b \cf3 put
+\f0\b0 \cf0  \cf4 "/tmp/"\cf0  \cf7 &\cf0  \cf6 suiteName\cf0  
+\f1\b \cf3 into
+\f0\b0 \cf0  \cf5 resultsName\cf0 \
+
+\f1\b if
+\f0\b0  \cf6 resultsName\cf0  \cf7 ends with\cf0  \cf4 ".suite"\cf0  
+\f1\b then
+\f0\b0  
+\f1\b \cf3 delete
+\f0\b0 \cf0  last item delimited by \cf4 "."\cf0  of \cf6 resultsName\cf0 \
+
+\f1\b \cf3 put
+\f0\b0 \cf0  \cf4 ".html"\cf0  
+\f1\b \cf3 after
+\f0\b0 \cf0  \cf5 resultsName\cf0 \
+\
+
+\f1\b \cf3 put
+\f0\b0 \cf0  \cf9 merge\cf0 (\cf6 template\cf0 ) 
+\f1\b \cf3 into
+\f0\b0 \cf0  \cf5 file resultsName\cf0  \cf2 -- generate the HTML report\cf0 \
+\
+
+\f1\b \cf3 open
+\f0\b0 \cf0  \cf6 resultsName\cf0  
+\f1\b \cf3 with
+\f0\b0 \cf0  \cf4 "Safari"\cf0  \cf2 -- and display it\cf0 \
+\
+\cf2 (* If you are set for Personal Web Sharing this file is now available online *)\
+
+\f1\b \cf3 copy file
+\f0\b0 \cf0  \cf6 resultsName\cf0  
+\f1\b \cf3 into folder
+\f0\b0 \cf0  \cf4 "~/Sites/Results"\cf0 \
+\cf2 -- open "http://localhost/~"& env(user) &"/Results" with "Safari" -- and display it\cf0 \
+}
