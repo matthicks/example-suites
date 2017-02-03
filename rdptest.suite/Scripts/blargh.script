@@ -1,0 +1,11 @@
+﻿Log connectionInfo()
+Repeat while ConnectionInfo().status is not "Connected"
+	Log "Waiting..."
+	wait 1
+	if repeatIndex() is 30 then exit repeat
+End Repeat
+WaitFor 15, "eggDrive"
+DoubleClick "thedifferencesin"
+TypeText ControlKey,"c"
+log remoteClipboard()
+Click foundImageLocation() + (100,100)
